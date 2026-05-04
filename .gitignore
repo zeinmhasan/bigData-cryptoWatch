@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Logs
+logs/
+nohup.out
+
+# Dashboard generated data (dibuat otomatis saat runtime)
+dashboard/data/live_api.json
+dashboard/data/live_rss.json
+dashboard/data/spark_results.json
+dashboard/data/forecast.json
+
+# Env
+.env

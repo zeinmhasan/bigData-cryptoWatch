@@ -1,0 +1,122 @@
+networks:
+  crypto-net:
+    driver: bridge
+
+volumes:
+  namenode_data:
+  datanode_data:
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    networks: [crypto-net]
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    networks: [crypto-net]
+    depends_on: [zookeeper]
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    networks: [crypto-net]
+    restart: unless-stopped
+    ports:
+      - "9870:9870"
+      - "8020:8020"
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=cryptowatch
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    networks: [crypto-net]
+    depends_on: [namenode]
+    restart: unless-stopped
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
+
+  producer-api:
+    build: .
+    container_name: producer-api
+    networks: [crypto-net]
+    depends_on: [kafka]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "-u", "producer_api.py"]
+
+  producer-rss:
+    build: .
+    container_name: producer-rss
+    networks: [crypto-net]
+    depends_on: [kafka]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "-u", "producer_rss.py"]
+
+  consumer-hdfs:
+    build: .
+    container_name: consumer-hdfs
+    networks: [crypto-net]
+    depends_on: [kafka, namenode]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./dashboard/data:/app/dashboard/data
+    command: ["python", "-u", "consumer_to_hdfs.py"]
+
+  spark-analyzer:
+    image: apache/spark:3.5.3
+    container_name: spark-analyzer
+    networks: [crypto-net]
+    depends_on: [namenode, consumer-hdfs]
+    restart: unless-stopped
+    user: root
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./spark:/opt/spark/work
+      - ./dashboard/data:/opt/dashboard-data
+    command: ["bash", "/opt/spark/work/run_spark.sh"]
+
+  dashboard:
+    build: .
+    container_name: dashboard
+    networks: [crypto-net]
+    depends_on: [consumer-hdfs]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./dashboard:/app/dashboard
+    command: ["python", "-u", "dashboard/app.py"]

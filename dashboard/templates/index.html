@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CryptoWatch Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; }
+    header {
+      background: #1a1d2e; padding: 16px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid #2a2d3e;
+    }
+    header h1 { color: #f7931a; font-size: 1.4rem; }
+    #last-update { font-size: 0.8rem; color: #888; }
+    .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1rem; color: #aaa; text-transform: uppercase;
+         letter-spacing: 1px; margin-bottom: 12px; }
+
+    /* harga live */
+    .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+    .price-card { background: #1a1d2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2d3e; text-align: center; }
+    .price-card .symbol { font-size: 1.4rem; font-weight: bold; color: #f7931a; }
+    .price-card .price  { font-size: 1.8rem; font-weight: bold; margin: 8px 0; }
+    .price-card .change { font-size: 1rem; font-weight: bold; }
+    .price-card .idr    { font-size: 0.8rem; color: #888; margin-top: 4px; }
+    .up   { color: #00c853; }
+    .down { color: #ff1744; }
+
+    /* spark */
+    .spark-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .spark-card { background: #1a1d2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2d3e; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { background: #252840; padding: 8px 10px; text-align: left; color: #aaa; }
+    td { padding: 8px 10px; border-bottom: 1px solid #2a2d3e; }
+    tr:last-child td { border-bottom: none; }
+
+    /* forecast */
+    .forecast-section { margin-bottom: 32px; }
+    .forecast-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab-btn {
+      background: #1a1d2e; border: 1px solid #2a2d3e; color: #aaa;
+      padding: 8px 20px; border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; font-weight: bold; transition: all 0.2s;
+    }
+    .tab-btn.active { background: #f7931a; border-color: #f7931a; color: #fff; }
+    .tab-btn:hover:not(.active) { border-color: #f7931a; color: #f7931a; }
+    .forecast-card { background: #1a1d2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2d3e; }
+    .forecast-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .forecast-legend { display: flex; gap: 20px; font-size: 0.8rem; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 24px; height: 3px; border-radius: 2px; }
+    .legend-history  { background: #00c853; }
+    .legend-forecast { background: #ff1744; }
+    .chart-container { position: relative; height: 320px; }
+    .forecast-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    .stat-box { background: #0f1117; border-radius: 8px; padding: 12px; text-align: center; border: 1px solid #2a2d3e; }
+    .stat-box .stat-label { font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    .stat-box .stat-val   { font-size: 1rem; font-weight: bold; }
+    .stat-box .stat-sub   { font-size: 0.7rem; color: #666; margin-top: 2px; }
+    .forecast-meta { font-size: 0.75rem; color: #555; margin-top: 10px; text-align: right; }
+
+    /* berita */
+    .news-list { background: #1a1d2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2d3e; margin-bottom: 32px; }
+    .news-item { padding: 12px 0; border-bottom: 1px solid #2a2d3e; }
+    .news-item:last-child { border-bottom: none; }
+    .news-item a { color: #4fc3f7; text-decoration: none; font-size: 0.9rem; }
+    .news-item a:hover { text-decoration: underline; }
+    .news-meta { font-size: 0.75rem; color: #666; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-right: 6px; }
+    .badge-rss { background: #1a2a3e; color: #4fc3f7; }
+    .badge-ml  { background: #2a1a3e; color: #ce93d8; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🪙 CryptoWatch Dashboard</h1>
+  <span id="last-update">Memuat data...</span>
+</header>
+
+<div class="container">
+
+  <!-- Panel 1: Harga Live -->
+  <h2>📡 Harga Live</h2>
+  <div class="price-grid" id="price-grid">
+    <div class="price-card"><div class="symbol">—</div></div>
+    <div class="price-card"><div class="symbol">—</div></div>
+    <div class="price-card"><div class="symbol">—</div></div>
+  </div>
+
+  <!-- Panel 2: Forecast -->
+  <h2>🤖 Prediksi Harga — SparkML</h2>
+  <div class="forecast-section">
+    <div class="forecast-tabs">
+      <button class="tab-btn active" onclick="switchCoin('BTC')">BTC</button>
+      <button class="tab-btn"        onclick="switchCoin('ETH')">ETH</button>
+      <button class="tab-btn"        onclick="switchCoin('BNB')">BNB</button>
+    </div>
+    <div class="forecast-card">
+      <div class="forecast-header">
+        <div>
+          <span id="forecast-title" style="font-weight:bold;font-size:1rem;">Bitcoin (BTC)</span>
+          <span class="badge badge-ml" style="margin-left:8px;">SparkML</span>
+        </div>
+        <div class="forecast-legend">
+          <div class="legend-item"><div class="legend-dot legend-history"></div><span style="color:#aaa">History</span></div>
+          <div class="legend-item"><div class="legend-dot legend-forecast"></div><span style="color:#aaa">Prediksi</span></div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="forecastChart"></canvas>
+      </div>
+      <div class="forecast-stats" id="forecast-stats">
+        <p style="color:#666;grid-column:span 3;text-align:center;padding:20px">Memuat data forecast...</p>
+      </div>
+      <div class="forecast-meta" id="forecast-meta"></div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Analisis Spark -->
+  <h2>📊 Analisis Spark</h2>
+  <div class="spark-grid">
+    <div class="spark-card">
+      <h2 style="margin-bottom:12px">Statistik Harga</h2>
+      <table>
+        <thead><tr><th>Koin</th><th>Rata-rata</th><th>Tertinggi</th><th>Terendah</th><th>Std Dev</th></tr></thead>
+        <tbody id="tbl-stats"></tbody>
+      </table>
+    </div>
+    <div class="spark-card">
+      <h2 style="margin-bottom:12px">Volatilitas per Jam</h2>
+      <table>
+        <thead><tr><th>Jam</th><th>Koin</th><th>Avg Volatilitas</th></tr></thead>
+        <tbody id="tbl-volatility"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Panel 4: Berita -->
+  <h2>📰 5 Berita Terbaru</h2>
+  <div class="news-list" id="news-list">
+    <p style="color:#666">Memuat berita...</p>
+  </div>
+
+</div>
+
+<script>
+let forecastData  = {};
+let activeCoin    = "BTC";
+let chartInstance = null;
+const COIN_NAMES  = { BTC: "Bitcoin (BTC)", ETH: "Ethereum (ETH)", BNB: "BNB (BNB)" };
+
+function fmt(n) {
+  return n == null ? "—" : Number(n).toLocaleString("en-US", {maximumFractionDigits: 2});
+}
+
+function fmtLabel(iso) {
+  // Format: "05/03 17:50" — tidak butuh library eksternal
+  const d = new Date(iso);
+  const mo = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  return `${mo}/${dd} ${hh}:${mm}`;
+}
+
+// ── Render harga live ─────────────────────────────────────
+function renderPrices(live) {
+  const grid = document.getElementById("price-grid");
+  if (!live || !live.length) return;
+  grid.innerHTML = live.map(c => {
+    const up = c.change_24h >= 0;
+    return `<div class="price-card">
+      <div class="symbol">${c.symbol}</div>
+      <div class="price">$${fmt(c.price_usd)}</div>
+      <div class="change ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(c.change_24h).toFixed(2)}%</div>
+      <div class="idr">Rp ${fmt(c.price_idr)}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── Render Spark tables ───────────────────────────────────
+function renderSpark(spark) {
+  if (!spark || typeof spark !== "object") return;
+  const stats = spark.statistik || [];
+  document.getElementById("tbl-stats").innerHTML = stats.map(r => `
+    <tr>
+      <td><b>${r.symbol}</b></td>
+      <td>$${fmt(r.rata_rata_usd)}</td>
+      <td class="up">$${fmt(r.tertinggi_usd)}</td>
+      <td class="down">$${fmt(r.terendah_usd)}</td>
+      <td>${fmt(r.std_deviasi)}</td>
+    </tr>`).join("");
+
+  const vols = spark.volatilitas || [];
+  document.getElementById("tbl-volatility").innerHTML = vols.map(r => `
+    <tr>
+      <td>${r.jam}:00</td><td>${r.symbol}</td><td>${fmt(r.avg_volatilitas)}%</td>
+    </tr>`).join("");
+}
+
+// ── Render berita ─────────────────────────────────────────
+function renderNews(news) {
+  const el = document.getElementById("news-list");
+  if (!news || !news.length) { el.innerHTML = "<p style='color:#666'>Belum ada berita.</p>"; return; }
+  el.innerHTML = news.slice(0, 5).map(n => `
+    <div class="news-item">
+      <span class="badge badge-rss">RSS</span>
+      <a href="${n.link}" target="_blank">${n.title}</a>
+      <div class="news-meta">${n.published||""} · ${n.source||""}</div>
+    </div>`).join("");
+}
+
+// ── Render forecast chart ─────────────────────────────────
+function renderForecastChart(coin) {
+  const statsEl = document.getElementById("forecast-stats");
+  const data = forecastData[coin];
+
+  if (!data || !data.history || data.history.length === 0) {
+    statsEl.innerHTML = "<p style='color:#666;grid-column:span 3;text-align:center;padding:20px'>Data forecast belum tersedia — Spark sedang memproses...</p>";
+    return;
+  }
+
+  const history  = data.history;
+  const forecast = data.forecast || [];
+  const model    = data.model    || {};
+
+  // ── Labels & datasets ─────────────────────────────────
+  // Semua label (history + forecast)
+  const histLabels = history.map(h => fmtLabel(h.timestamp));
+  const foreLabels = forecast.map(f => fmtLabel(f.timestamp));
+  const allLabels  = [...histLabels, ...foreLabels];
+
+  // History data: nilai di posisi history, null di posisi forecast
+  const histData = [
+    ...history.map(h => h.price),
+    ...forecast.map(() => null)
+  ];
+
+  // Forecast data: null di posisi history (kecuali titik terakhir sebagai sambungan), lalu forecast
+  const lastHistPrice = history[history.length - 1].price;
+  const foreData = [
+    ...history.map((_, i) => i === history.length - 1 ? lastHistPrice : null),
+    ...forecast.map(f => f.price)
+  ];
+
+  // ── Destroy chart lama ────────────────────────────────
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const ctx = document.getElementById("forecastChart").getContext("2d");
+  chartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: allLabels,
+      datasets: [
+        {
+          label: "History",
+          data:  histData,
+          borderColor:     "#00c853",
+          backgroundColor: "rgba(0,200,83,0.08)",
+          borderWidth: 2,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: true,
+          spanGaps: false,
+        },
+        {
+          label: "Prediksi",
+          data:  foreData,
+          borderColor:     "#ff1744",
+          backgroundColor: "rgba(255,23,68,0.06)",
+          borderWidth: 2.5,
+          borderDash: [6, 3],
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          tension: 0.3,
+          fill: true,
+          spanGaps: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1a1d2e",
+          borderColor: "#2a2d3e",
+          borderWidth: 1,
+          titleColor: "#aaa",
+          bodyColor: "#fff",
+          callbacks: {
+            label: item => {
+              if (item.raw == null) return null;
+              return `${item.dataset.label}: $${Number(item.raw).toLocaleString("en-US",{maximumFractionDigits:2})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid:  { color: "#1e2030" },
+          ticks: {
+            color: "#666",
+            maxTicksLimit: 10,
+            maxRotation: 45,
+          }
+        },
+        y: {
+          grid:  { color: "#1e2030" },
+          ticks: {
+            color: "#666",
+            callback: val => "$" + Number(val).toLocaleString("en-US", {maximumFractionDigits: 0})
+          }
+        }
+      }
+    }
+  });
+
+  // ── Stats boxes ───────────────────────────────────────
+  const lastPrice     = lastHistPrice;
+  const lastForecast  = forecast.length ? forecast[forecast.length-1].price : null;
+  const diff    = (lastForecast != null) ? lastForecast - lastPrice : null;
+  const diffPct = (diff != null && lastPrice) ? (diff / lastPrice * 100) : null;
+
+  statsEl.innerHTML = `
+    <div class="stat-box">
+      <div class="stat-label">Harga Terakhir</div>
+      <div class="stat-val">$${fmt(lastPrice)}</div>
+      <div class="stat-sub">${fmtLabel(history[history.length-1].timestamp)}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Prediksi +${forecast.length} interval</div>
+      <div class="stat-val ${diff!=null&&diff>=0?'up':'down'}">$${fmt(lastForecast)}</div>
+      <div class="stat-sub ${diff!=null&&diff>=0?'up':'down'}">
+        ${diff!=null ? (diff>=0?'▲':'▼')+' '+Math.abs(diffPct).toFixed(2)+'%' : '—'}
+      </div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Model Terbaik (R²)</div>
+      <div class="stat-val">${model.r2 != null ? Number(model.r2).toFixed(4) : "—"}</div>
+      <div class="stat-sub">${model.name || "SparkML"} · MAE: $${fmt(model.mae)}</div>
+    </div>`;
+
+  document.getElementById("forecast-meta").textContent =
+    `${history.length} titik history · ${forecast.length} titik prediksi · SparkML ${model.name||'AutoML'} (terbaik dari LR + RF + GBT)`;
+}
+
+// ── Switch coin tab ───────────────────────────────────────
+function switchCoin(coin) {
+  activeCoin = coin;
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.classList.toggle("active", b.textContent.trim() === coin);
+  });
+  document.getElementById("forecast-title").textContent = COIN_NAMES[coin] || coin;
+  renderForecastChart(coin);
+}
+
+// ── Fetch ─────────────────────────────────────────────────
+function fetchData() {
+  fetch("/api/data")
+    .then(r => r.json())
+    .then(data => {
+      renderPrices(data.live);
+      renderSpark(data.spark);
+      renderNews(data.news);
+      document.getElementById("last-update").textContent =
+        "Update: " + new Date().toLocaleTimeString("id-ID");
+    })
+    .catch(e => console.error("fetchData error:", e));
+}
+
+function fetchForecast() {
+  fetch("/api/forecast")
+    .then(r => r.json())
+    .then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data) && Object.keys(data).length > 0) {
+        forecastData = data;
+        renderForecastChart(activeCoin);
+      }
+    })
+    .catch(e => console.error("fetchForecast error:", e));
+}
+
+// ── Init ──────────────────────────────────────────────────
+fetchData();
+fetchForecast();
+setInterval(fetchData,     30000);
+setInterval(fetchForecast, 60000);
+</script>
+</body>
+</html>
