@@ -146,6 +146,8 @@ Yang dicek:
 - Ketersediaan file di HDFS
 
 ## Tampilan Monitor
+<img width="1920" height="3682" alt="screencapture-localhost-5000-2026-05-04-14_18_36" src="https://github.com/user-attachments/assets/57881e67-5967-4852-b7cc-6a07ddf78aac" />
+
 
 ## Catatan
 
